@@ -1,0 +1,73 @@
+name: Bug report
+description: Report a page that converts badly, or any other bug.
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a report. **If this is a security vulnerability, do
+        NOT use this form** — see [SECURITY.md](../blob/main/.github/SECURITY.md)
+        for private disclosure.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect the Markdown to be, and what did you get instead?
+      placeholder: The article's code block lost its language fence and came out as plain text…
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Page URL (if public)
+      description: The URL that reproduces it, if it isn't private.
+      placeholder: "https://example.com/the-article"
+    validations:
+      required: false
+  - type: textarea
+    id: html
+    attributes:
+      label: Minimal HTML fragment
+      description: The smallest HTML snippet that reproduces it. Redact anything private.
+      render: html
+    validations:
+      required: false
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Noise removal (something kept that should be dropped, or vice versa)
+        - Main-content selection (wrong container picked)
+        - Markdown conversion (headings, lists, code, tables, links)
+        - Metadata extraction (title, description, canonical, date)
+        - Fetch (timeout, redirects, size cap, content-type)
+        - Token estimate / whitespace
+        - CLI
+        - SDK / types
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: web-to-markdown version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime
+      placeholder: "Node v22.x / Cloudflare Workers / Deno / Bun (run: node --version)"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Paste the Markdown you got and/or any error. **Redact anything private first.**
+      render: shell
+    validations:
+      required: false

@@ -1,0 +1,39 @@
+name: Feature request
+description: Propose a new conversion capability, output option, or CLI flag.
+title: "[feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The most useful proposals come with a concrete page or HTML fragment the
+        feature would handle. A real-world example is worth a lot.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What can't you convert or control today?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - New HTML element support in the Markdown output
+        - Noise-removal heuristics (better content selection)
+        - Metadata extraction
+        - Fetch behavior (headers, redirects, limits)
+        - Output format / token shrinkage
+        - CLI / SDK ergonomics
+        - Edge / Workers deployment
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: How should it work? An HTML fragment or example helps.
+    validations:
+      required: true

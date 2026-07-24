@@ -1,0 +1,10 @@
+# Ejemplo de despliegue de web-to-markdown en Cloudflare Workers.
+# Es una demostración mínima (sin auth ni cuotas). Ver worker.ts.
+
+name = "web-to-markdown-example"
+main = "worker.ts"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Escalado a cero: sin peticiones, sin factura.
+workers_dev = true

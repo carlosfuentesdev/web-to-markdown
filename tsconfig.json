@@ -1,0 +1,32 @@
+{
+  // Comprobación de tipos del activo: cubre `src/` y `tests/`. El build de
+  // publicación usa `tsconfig.build.json`, que sólo emite `src/` a `dist/`.
+  //
+  // El núcleo de conversión es autónomo: no depende de la fábrica ni de ningún
+  // runtime concreto (usa sólo APIs web estándar: fetch, URL, TextDecoder), por
+  // eso corre igual en Node, Deno, Bun y Cloudflare Workers.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "useUnknownInCatchVariables": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "sourceMap": true,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

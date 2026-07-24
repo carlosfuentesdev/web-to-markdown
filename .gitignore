@@ -1,0 +1,17 @@
+# Dependencias
+node_modules/
+
+# Compilado
+dist/
+*.tsbuildinfo
+
+# Cobertura de tests
+coverage/
+html/
+
+# Sistema operativo / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

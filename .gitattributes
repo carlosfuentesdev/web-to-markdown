@@ -1,0 +1,3 @@
+# Normaliza los saltos de línea a LF en el repositorio, con independencia del SO
+# de quien contribuya. Evita diffs espurios entre Windows y Unix.
+* text=auto eol=lf

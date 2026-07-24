@@ -1,0 +1,13 @@
+{
+  // Build de publicación: compila sólo `src/` a `dist/`, con `rootDir` en `src`
+  // para que el árbol emitido quede plano (`dist/cli.js`, `dist/index.js`,
+  // `dist/convert/...`) y `bin`/`main`/`exports` apunten a rutas limpias.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["tests"]
+}
