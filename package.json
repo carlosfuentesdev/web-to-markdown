@@ -1,6 +1,6 @@
 {
   "name": "@karlangas12/web-to-markdown",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Turn any web page or raw HTML into clean, dense, LLM-ready Markdown. Runs on Cloudflare Workers, Node, Deno & Bun — CLI + SDK.",
   "license": "MIT",

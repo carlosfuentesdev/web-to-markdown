@@ -10,9 +10,52 @@
  */
 
 import { ConvertError } from './errors.js';
+import { validateSafeUrlWithDns } from './url-safety.js';
+
+/*
+ * Forma mínima de `TextDecoder` que necesita este fichero: sólo `decode`, y
+ * sólo con entrada no nula, que es como se llama siempre aquí.
+ *
+ * Se declara a propósito en vez de anotar con el `TextDecoder` real de algún
+ * sitio, porque los dos candidatos disponibles no son intercambiables: los
+ * tipos de `@cloudflare/workers-types` y los de `@types/node` (`node:util`)
+ * declaran `decode()` con firmas distintas (Node acepta `null` en la entrada,
+ * Workers no), así que anotar con uno y dejar que el otro construya el valor
+ * en tiempo de ejecución falla con "Type 'TextDecoder' is not assignable to
+ * type 'TextDecoder'" en cuanto ambos conviven en la misma compilación — que
+ * es exactamente lo que pasa en el tsconfig de la raíz, donde este paquete
+ * convive con `worker.ts` y sus tipos de Workers.
+ *
+ * Con una interfaz estructural propia, cualquiera de los dos `TextDecoder`
+ * reales encaja sin conflicto, y el tsconfig aislado del paquete publicable
+ * —que no incluye `@cloudflare/workers-types` a propósito, porque `worker.ts`
+ * queda fuera del artefacto de npm— tampoco necesita ya ningún import externo
+ * para tener un *tipo*, y no sólo un valor, al que anotar.
+ *
+ * El parámetro de `decode` es `any` a propósito: `ArrayBuffer`/`ArrayBufferView`
+ * tienen formas ligeramente distintas entre las declaraciones de Node y de
+ * Workers (una acepta `null`, la otra parametriza `ArrayBufferView` de forma
+ * genérica), y a esta función no le importa precisar eso — sólo que exista un
+ * `decode` que reciba lo que ya se le pasa (`ArrayBuffer` o `Uint8Array`) y
+ * devuelva una cadena.
+ */
+interface MinimalTextDecoder {
+  decode(input: any): string;
+}
 
 /** Tamaño máximo de la respuesta que aceptamos descargar (5 MB). */
 export const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Redirecciones que seguimos como máximo.
+ *
+ * Las seguimos a mano, saltando de una en una, en lugar de delegar en
+ * `redirect: 'follow'`: sólo así se puede comprobar cada destino intermedio.
+ * Con seguimiento automático, una URL pública que responda `302` hacia
+ * `http://169.254.169.254/` se saltaría entera la defensa contra SSRF, porque
+ * el runtime haría esa segunda petición sin pasar por nuestro filtro.
+ */
+export const MAX_REDIRECTS = 5;
 
 /** Timeout de descarga por defecto (5 s). */
 export const DEFAULT_TIMEOUT_MS = 5_000;
@@ -48,29 +91,20 @@ export async function fetchHtml(target: string, options: FetchHtmlOptions = {}):
     throw new ConvertError('fetch_failed', 'El runtime no dispone de fetch(). Actualiza a Node >= 20.');
   }
 
-  const url = parseHttpUrl(target);
   const maxBytes = options.maxBytes ?? MAX_RESPONSE_BYTES;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
   let response: Response;
+  let finalUrl: string;
   try {
-    response = await fetchImpl(url, {
-      redirect: 'follow',
+    // El timeout cubre toda la cadena de redirecciones, no cada salto: quien
+    // llama pidió un límite total de espera, no uno por petición.
+    ({ response, finalUrl } = await fetchFollowingSafeRedirects(target, fetchImpl, {
       signal: controller.signal,
-      headers: {
-        'User-Agent': options.userAgent ?? DEFAULT_USER_AGENT,
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en,es;q=0.8',
-      },
-    });
-  } catch (cause) {
-    throw new ConvertError(
-      'fetch_failed',
-      'No se pudo descargar la página (timeout, DNS o red). Comprueba la URL.',
-      { cause },
-    );
+      userAgent: options.userAgent ?? DEFAULT_USER_AGENT,
+    }));
   } finally {
     clearTimeout(timeout);
   }
@@ -83,34 +117,100 @@ export async function fetchHtml(target: string, options: FetchHtmlOptions = {}):
     );
   }
 
-  assertHtmlContentType(response.headers.get('content-type'));
+  const contentType = response.headers.get('content-type');
+  assertHtmlContentType(contentType);
   assertDeclaredSize(response.headers.get('content-length'), maxBytes);
 
-  const html = await readCappedText(response, maxBytes);
+  const html = await readCappedText(response, maxBytes, contentType);
   if (html.trim().length === 0) {
     throw new ConvertError('empty_content', 'La página no devolvió contenido.');
   }
 
-  return { html, url: response.url.length > 0 ? response.url : url.toString() };
+  return { html, url: finalUrl };
 }
 
-/** Valida y normaliza la URL; solo se admite http(s). */
-function parseHttpUrl(target: string): URL {
-  let url: URL;
-  try {
-    url = new URL(target);
-  } catch {
-    throw new ConvertError('invalid_url', `La URL no es válida: "${target}".`);
+/** Códigos de estado que representan una redirección con destino en `Location`. */
+const REDIRECT_STATUSES: ReadonlySet<number> = new Set([301, 302, 303, 307, 308]);
+
+/**
+ * Descarga siguiendo las redirecciones a mano, validando cada destino.
+ *
+ * Cada salto pasa por {@link validateSafeUrlWithDns} antes de pedirse, de modo
+ * que ni la URL original ni ninguna de las intermedias puedan apuntar a la red
+ * interna. Devuelve la última respuesta y la URL que la produjo.
+ */
+async function fetchFollowingSafeRedirects(
+  target: string,
+  fetchImpl: FetchLike,
+  options: { readonly signal: AbortSignal; readonly userAgent: string },
+): Promise<{ response: Response; finalUrl: string }> {
+  let current = target;
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    // Lanza `blocked_host` si el destino apunta a la red interna. Va dentro del
+    // bucle a propósito: comprobar sólo la primera URL no serviría de nada.
+    await validateSafeUrlWithDns(current);
+
+    // Ya validada, se normaliza: la URL canónica es la que se devuelve como
+    // base para resolver los enlaces relativos del documento.
+    current = new URL(current).toString();
+
+    let response: Response;
+    try {
+      response = await fetchImpl(current, {
+        redirect: 'manual',
+        signal: options.signal,
+        headers: {
+          'User-Agent': options.userAgent,
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en,es;q=0.8',
+        },
+      });
+    } catch (cause) {
+      throw new ConvertError(
+        'fetch_failed',
+        'No se pudo descargar la página (timeout, DNS o red). Comprueba la URL.',
+        { cause },
+      );
+    }
+
+    const location = response.headers.get('location');
+    if (!REDIRECT_STATUSES.has(response.status) || location === null) {
+      // No es una redirección utilizable: es la respuesta final, sea 200 o no.
+      return { response, finalUrl: current };
+    }
+
+    // El cuerpo de una redirección no interesa, pero hay que cerrarlo para no
+    // dejar la conexión abierta mientras seguimos con el salto siguiente.
+    await response.body?.cancel().catch(() => undefined);
+
+    try {
+      // `Location` puede ser relativa; se resuelve contra la URL actual.
+      current = new URL(location, current).toString();
+    } catch {
+      throw new ConvertError(
+        'invalid_url',
+        `La redirección apunta a una URL que no es válida: "${location}".`,
+      );
+    }
   }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new ConvertError('unsupported_protocol', 'Solo se admiten URLs http:// y https://.');
-  }
-  return url;
+
+  throw new ConvertError(
+    'fetch_failed',
+    `La página encadena más de ${MAX_REDIRECTS} redirecciones.`,
+  );
 }
 
 /** Rechaza contenidos que claramente no son HTML (imágenes, PDF, JSON...). */
 function assertHtmlContentType(contentType: string | null): void {
-  if (contentType === null || contentType.trim().length === 0) return; // sin cabecera: lo intentamos
+  // Sin cabecera Content-Type no hay nada que comprobar: lo intentamos. Es
+  // una decisión deliberada, no un descuido — servidores mal configurados
+  // que omiten esta cabecera son comunes, y rechazar de más perdería
+  // páginas legítimas. El riesgo que esto podría abrir (un contenido no-HTML
+  // grande y patológico colándose hasta el analizador) ya está cubierto de
+  // forma independiente por `MAX_PARSE_BYTES` en `convert.ts`, que no
+  // depende del Content-Type para nada.
+  if (contentType === null || contentType.trim().length === 0) return;
   const normalized = contentType.toLowerCase();
   const looksLikeHtml =
     normalized.includes('text/html') ||
@@ -139,9 +239,14 @@ function assertDeclaredSize(contentLength: string | null, maxBytes: number): voi
  * Comprueba el tamaño mientras hace streaming, porque Content-Length puede
  * mentir (o no venir) y no queremos que una respuesta enorme reviente la memoria.
  */
-async function readCappedText(response: Response, maxBytes: number): Promise<string> {
+async function readCappedText(
+  response: Response,
+  maxBytes: number,
+  contentType: string | null,
+): Promise<string> {
+  const decoder = resolveTextDecoder(contentType);
   const body = response.body;
-  if (body === null) return response.text();
+  if (body === null) return decoder.decode(await response.arrayBuffer());
 
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
@@ -168,5 +273,35 @@ async function readCappedText(response: Response, maxBytes: number): Promise<str
     merged.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return new TextDecoder('utf-8').decode(merged);
+  return decoder.decode(merged);
+}
+
+/** Extrae el `charset` de una cabecera Content-Type (p. ej. "text/html; charset=koi8-r"). */
+function extractCharset(contentType: string | null): string | null {
+  if (contentType === null) return null;
+  const match = /charset\s*=\s*"?([^;"\s]+)"?/i.exec(contentType);
+  return match?.[1]?.trim() ?? null;
+}
+
+/**
+ * Resuelve el decodificador de texto a partir del `charset` declarado por el
+ * servidor en `Content-Type`.
+ *
+ * No hacemos detección heurística (tipo chardet): sólo confiamos en lo que el
+ * propio servidor declaró explícitamente. Si no declara nada, o declara un
+ * encoding que el runtime no reconoce, caemos a UTF-8 (el comportamiento de
+ * siempre) — nunca lo empeoramos, sólo lo mejoramos cuando hay información
+ * fiable. `TextDecoder` en Cloudflare Workers implementa el estándar WHATWG
+ * Encoding completo (a diferencia de `TextEncoder`, que sólo codifica a
+ * UTF-8), así que basta con intentar construirlo: si la etiqueta no se
+ * reconoce, lanza `RangeError` y lo capturamos aquí.
+ */
+function resolveTextDecoder(contentType: string | null): MinimalTextDecoder {
+  const charset = extractCharset(contentType);
+  if (charset === null) return new TextDecoder('utf-8');
+  try {
+    return new TextDecoder(charset);
+  } catch {
+    return new TextDecoder('utf-8');
+  }
 }

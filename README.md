@@ -4,17 +4,17 @@
 
 **Turn any web page or raw HTML into clean, dense, LLM-ready Markdown.**
 Strips the navigation, cookie banners, ads and footers; keeps the headings,
-lists, code blocks, links and tables. Runs on Cloudflare Workers, Node, Deno and
-Bun — and in your terminal.
+lists, code blocks, links and tables. Runs at the edge (Cloudflare Workers) and
+in your terminal.
 
 [![npm](https://img.shields.io/npm/v/@karlangas12/web-to-markdown?color=cb3837&logo=npm)](https://www.npmjs.com/package/@karlangas12/web-to-markdown)
-[![tests](https://img.shields.io/badge/tests-38%20passing-brightgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-43%20passing-brightgreen)](#testing)
 [![latency](https://img.shields.io/badge/html%E2%86%92md-~3ms-blue)](#performance)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen)](https://nodejs.org)
 [![zero telemetry](https://img.shields.io/badge/telemetry-none-success)](#privacy)
 
-[Quick start](#quick-start) · [CLI](#cli) · [SDK](#sdk) · [Edge](#run-it-on-the-edge) · [Limitations](#honest-limitations) · [Español](README.es.md)
+[Quick start](#quick-start) · [CLI](#cli) · [HTTP API](#http-api) · [SDK](#sdk) · [Deploy](#deploy-your-own-edge-api) · [Limitations](#honest-limitations) · [Español](README.es.md)
 
 </div>
 
@@ -42,8 +42,7 @@ and the model reads around it.
 `web-to-markdown` does one thing: it extracts the actual content and emits the
 densest faithful Markdown it can, so a context window holds more signal per
 token. No headless browser, no heavyweight parser — a small AST pass that runs
-in **single-digit milliseconds** and, because it uses only web-standard APIs,
-runs anywhere: the edge, a serverless function, or a script.
+in **single-digit milliseconds** and deploys to the edge at zero idle cost.
 
 It's built for the places that consume context: Cursor, Claude Code, RAG
 pipelines, and autonomous agents that need to read a page mid-task.
@@ -96,10 +95,189 @@ web-to-markdown https://example.com/post --json > post.json
 
 Markdown goes to **stdout**; status lines go to **stderr** — so pipes stay clean.
 
+## HTTP API
+
+### Overview
+
+**Web to Markdown API** turns any public URL (or a raw HTML blob) into clean,
+LLM-ready Markdown over a simple authenticated HTTP endpoint. It runs on
+Cloudflare Workers, so every request is served at the edge with no cold
+infrastructure to manage.
+
+**Base URL (production):**
+
+```
+https://web-to-markdown.karlangas12.workers.dev
+```
+
+### Authentication & quotas
+
+Every request under `/v1/*` requires an API key, sent as:
+
+```
+x-api-key: your_api_key
+```
+
+(`Authorization: Bearer your_api_key` is also accepted, if that fits your
+client better.) `GET /salud` is public and needs no key.
+
+| Plan | Quota | Window |
+| --- | --- | --- |
+| Free | 500 conversions | per calendar month |
+| Pro | 2,000 conversions | per calendar month |
+
+Every authenticated response carries standard rate-limit headers:
+
+| Header | Meaning |
+| --- | --- |
+| `RateLimit-Limit` | The quota for your plan, in this window |
+| `RateLimit-Remaining` | Requests left before the window resets |
+| `RateLimit-Reset` | Unix timestamp (seconds) when the window resets |
+
+Once the quota is spent, the API responds `429 Too Many Requests` with a
+`Retry-After` header (seconds until the next window).
+
+### Endpoints
+
+#### `GET /salud`
+
+Public health check. No API key required.
+
+```bash
+curl https://web-to-markdown.karlangas12.workers.dev/salud
+```
+
+`200 OK`:
+
+```json
+{
+  "ok": true,
+  "data": { "estado": "ok", "entorno": "production" }
+}
+```
+
+#### `POST /v1/convert`
+
+Converts a page to Markdown. Body is JSON with exactly one of `url` or `html`:
+
+```json
+{ "url": "https://example.com" }
+```
+
+Optional `options`: `{ "include_images": false, "extract_metadata": true }`
+(both default to `false`).
+
+**`200 OK`** — conversion succeeded:
+
+```json
+{
+  "ok": true,
+  "data": {
+    "markdown": "# Example Domain\n\nThis domain is for use in documentation examples…",
+    "metadata": null
+  }
+}
+```
+
+Set `Accept: text/markdown` (or `?format=markdown` on the `GET` variant below)
+to get the raw Markdown body instead of the JSON envelope.
+
+**`401 Unauthorized`** — the `x-api-key` header is missing or the key isn't
+valid:
+
+```json
+{
+  "ok": false,
+  "error": { "code": "unauthorized", "message": "La API key no es válida." }
+}
+```
+
+**`429 Too Many Requests`** — you've used up your plan's monthly quota:
+
+```json
+{
+  "ok": false,
+  "error": { "code": "rate_limited", "message": "Has superado el límite de 500 peticiones. Reintenta en 1234 s." }
+}
+```
+
+There's also a one-shot `GET /v1/convert?url=` variant for agents and curl
+one-liners; pass `?metadata=true` / `?images=true` to enable those options.
+
+### Code examples
+
+**cURL**
+
+```bash
+curl -X POST https://web-to-markdown.karlangas12.workers.dev/v1/convert \
+  -H "x-api-key: your_api_key" \
+  -H "Content-Type: application/json" \
+  -d '{ "url": "https://example.com" }'
+```
+
+**JavaScript / TypeScript** (native `fetch` — Node.js 18+ or browser)
+
+```ts
+const response = await fetch('https://web-to-markdown.karlangas12.workers.dev/v1/convert', {
+  method: 'POST',
+  headers: {
+    'x-api-key': process.env.WEB_TO_MARKDOWN_API_KEY!,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ url: 'https://example.com' }),
+});
+
+const { data } = await response.json();
+console.log(data.markdown);
+```
+
+**Python** (`requests`)
+
+```python
+import os
+import requests
+
+response = requests.post(
+    "https://web-to-markdown.karlangas12.workers.dev/v1/convert",
+    headers={"x-api-key": os.environ["WEB_TO_MARKDOWN_API_KEY"]},
+    json={"url": "https://example.com"},
+)
+response.raise_for_status()
+print(response.json()["data"]["markdown"])
+```
+
+### Getting an API key
+
+API keys are provisioned through [Polar.sh](https://polar.sh), the billing
+provider behind the Free and Pro plans. Subscribe directly:
+
+- [Subscribe to Free — 500 requests/month, €0](https://buy.polar.sh/polar_cl_cDg8li7Rt4bcDmx5DirqhiEFrgMozTKiTJ8b513oy4F)
+- [Subscribe to Pro — 2,000 requests/month, €5/mo](https://buy.polar.sh/polar_cl_YF0y9Ej4ypE0afXDbAP1Dnx8HiNuafPHAsRNG4VQvAp)
+
+Prefer to see pricing and product details first? [View the full product
+page](https://thenapply.dev/web-to-markdown/).
+
+1. Subscribe to the Free or Pro plan through the Polar checkout for this
+   product.
+2. Polar notifies us of your subscription; we issue your `x-api-key` and send
+   it to the email address on your Polar account.
+3. Upgrading or cancelling your Polar subscription automatically raises or
+   lowers your existing key's quota — no need to request a new key.
+
+> Key issuance today is a manual step on our side rather than instant
+> self-service delivery — expect your key shortly after subscribing, not
+> immediately in the checkout flow.
+
+Auth, per-plan rate limiting and the billing webhook all come from the
+factory core — see
+[Deploy your own edge API](#deploy-your-own-edge-api) if you're running your
+own instance instead of using the hosted one above.
+
 ## SDK
 
-Everything the CLI uses is exported and dependency-light (one HTML parser, one
-validator). It's synchronous for HTML, async only when it has to fetch.
+Everything the CLI and Worker use is exported and dependency-light (one HTML
+parser, one validator). It's synchronous for HTML, async only when it has to
+fetch.
 
 ```ts
 import {
@@ -135,25 +313,6 @@ const page = await convertUrl('https://example.com', {
 | `maxBytes` | `5 MB` | Hard cap on the downloaded response |
 | `userAgent` | identifiable UA | User-Agent header sent when fetching |
 
-### Metadata
-
-With `extractMetadata: true` you also get:
-
-```json
-{
-  "title": "Article title",
-  "description": "A short summary.",
-  "canonicalUrl": "https://example.com/article",
-  "publishedAt": "2026-07-01T10:00:00.000Z",
-  "wordCount": 1240,
-  "estimatedTokens": 1660,
-  "readingTimeMinutes": 6
-}
-```
-
-Title falls back Open Graph → `<title>` → first `<h1>`; the publish date is
-normalized to ISO 8601; the token count is a fast estimate (see the limitations).
-
 ## What it does
 
 **Removes the noise.** `script`, `style`, `iframe`, `svg`, `form` and friends
@@ -171,31 +330,70 @@ Markdown with escaped pipes.
 of blank lines fold to a single paragraph break. The result is Markdown a model
 reads cleanly with nothing spent on layout.
 
-## Run it on the edge
+**Reads the metadata.** Optionally returns title (Open Graph → `<title>` →
+first `<h1>`), description, canonical URL, detected publish date (normalized to
+ISO 8601), word count, a fast token estimate and reading time.
 
-The conversion core uses only web-standard APIs (`fetch`, `URL`, `TextDecoder`,
-`AbortController`), so it runs on Cloudflare Workers, Deno and Bun with no shim.
-A minimal, deployable Worker built on the SDK lives in
-[`examples/cloudflare-worker`](examples/cloudflare-worker):
+### Framework-hydrated pages
 
-```ts
-import { convertUrl } from '@karlangas12/web-to-markdown';
+**Recovers content a SPA left behind — without running any JavaScript.** When
+the visible DOM comes back essentially empty (the classic
+`<div id="root"></div>`), it looks for the data the framework already
+serialized into the HTML for its own hydration, and reads that instead. Four
+sources, tried in order of how much they can be trusted:
 
-export default {
-  async fetch(request: Request): Promise<Response> {
-    const target = new URL(request.url).searchParams.get('url');
-    if (!target) return new Response('Missing ?url=', { status: 400 });
-    const { markdown } = await convertUrl(target);
-    return new Response(markdown, {
-      headers: { 'content-type': 'text/markdown; charset=utf-8' },
-    });
-  },
-};
+| Source | What it is |
+| --- | --- |
+| `application/ld+json` | schema.org JSON-LD. A real standard, explicitly labelled, framework-independent — by far the most reliable, so it wins when several are present. |
+| `__NEXT_DATA__` | Next.js Pages Router. One well-formed JSON blob. |
+| `self.__next_f.push(...)` | Next.js App Router (RSC). A chunked, escaped stream; prose is recovered from it best-effort, since the format is neither public nor stable. |
+| `window.__NUXT__` | Nuxt, and only when that value happens to be JSON. Sometimes it's a self-invoking function instead, and then it's skipped rather than evaluated. |
+
+Be clear about what this is and isn't. It is **parsing text that already
+arrived in the response** — no JS engine, no browser, no evaluation of
+anything. It is not rendering, and it is not a general answer to "handle
+JavaScript sites". If a page fetches its content after load, or hides it behind
+a framework this doesn't recognise, you get the same empty result as before.
+The fallback only kicks in when the normal extraction yields under 200
+characters, and only replaces it when it actually recovers more text — a short
+but legitimate page is never traded for stray fragments of a JSON blob.
+
+**Refuses to touch your internal network.** URLs pointing at loopback, private
+or link-local addresses — `127.0.0.1`, `10.0.0.0/8`, `172.16.0.0/12`,
+`192.168.0.0/16`, `169.254.0.0/16` (which includes the `169.254.169.254` cloud
+metadata endpoint), `localhost`, `::1`, `fc00::/7`, `fe80::/10` — are rejected
+before any request goes out. This is deliberate, not configurable: this library
+is built to be handed URLs that came from your users, and without that filter it
+would be an SSRF proxy into whatever network you run it on. Every redirect hop
+is re-checked too, so a public URL can't bounce you somewhere private. On
+Node.js the hostname is also resolved and each resulting IP is checked, which
+catches public domains that quietly point at `127.0.0.1`; on Cloudflare Workers,
+where no DNS resolver is exposed, only the literal check applies.
+
+## Deploy your own edge API
+
+The Worker is not published to npm — you deploy your own with
+[Wrangler](https://developers.cloudflare.com/workers/). It ships with the full
+monetizable circuit from the factory core: **validated config → structured
+logging → API-key auth → per-plan rate limit → conversion**, plus a
+Merchant-of-Record webhook endpoint for billing.
+
+```bash
+wrangler kv namespace create CLAVES        # API keys (hash → record)
+wrangler kv namespace create CONTADORES    # rate-limit counters
+wrangler kv namespace create EVENTOS       # webhook idempotency
+# paste each returned id into wrangler.toml
+
+wrangler secret put POLAR_WEBHOOK_SECRET   # billing webhook signing secret
+
+wrangler dev        # http://localhost:8787
+wrangler deploy
 ```
 
-That example is unauthenticated on purpose — it's a demo. For a real service, add
-an API key, a per-plan rate limit, and (because it fetches arbitrary URLs) an
-SSRF allow-list in front of the fetch. See [SECURITY.md](.github/SECURITY.md).
+`GET /salud` is an unauthenticated health probe. `/v1/*` requires an API key
+(`Authorization: Bearer …` or `X-API-Key`) and enforces the caller's plan quota,
+returning `RateLimit-*` headers. `POST /webhooks/polar` receives Polar's
+subscription events and activates or reverts the caller's plan accordingly.
 
 ## Performance
 
@@ -215,25 +413,31 @@ the 5 s timeout and the 5 MB size cap. No headless browser is ever launched.
 
 The library and CLI make exactly one network call — the page you asked for —
 and only in `convertUrl`. `convertHtml` touches no network at all. No telemetry,
-no analytics, nothing phones home.
+no analytics, nothing phones home. What you deploy on your own Worker is yours.
 
 ## Part of a combo
 
-`web-to-markdown` is one of a small toolkit for people wiring up AI agents. They
-compose:
+`web-to-markdown` is the third asset of a small toolkit for people wiring up AI
+agents. They compose:
 
-- **[openapi-to-mcp](https://www.npmjs.com/package/@karlangas12/openapi-to-mcp)** — turn any OpenAPI spec into a live MCP server (gives the agent **tools**).
-- **[mcp-shield-proxy](https://github.com/Karlangas12/mcp-shield-proxy)** — a local firewall that inspects what your MCP tools do (gives it **safety**).
-- **web-to-markdown** — feed those tools clean, dense context from the web (gives it **context**).
+- **[openapi-to-mcp](https://www.npmjs.com/package/@karlangas12/openapi-to-mcp)** — turn any OpenAPI spec into a live MCP server.
+- **[mcp-shield-proxy](https://github.com/Karlangas12/mcp-shield-proxy)** — a local firewall that inspects what your MCP tools do.
+- **web-to-markdown** — feed those tools clean, dense context from the web.
 
 ## Honest limitations
 
 Worth reading before you rely on this.
 
-- **It's a heuristic extractor, not a renderer.** It reads the HTML you give it;
-  it does not execute JavaScript. A page that ships an empty `<div id="root">`
-  and paints everything client-side has nothing to extract — you'd need a
-  headless browser upstream, which this deliberately isn't.
+- **It's a heuristic extractor, not a renderer.** It reads the HTML you give it
+  and **never executes JavaScript** — there is no JS engine and no browser
+  anywhere in this package. When a client-rendered page ships an empty
+  `<div id="root">`, it falls back to reading the data the framework already
+  serialized into the response (see [Framework-hydrated pages](#framework-hydrated-pages)),
+  which covers a good share of Next.js and Nuxt sites but not all of them. A
+  page whose content only exists after its own code runs — fetched on mount,
+  say — still has nothing to extract, and no amount of parsing will change
+  that. For those you need a headless browser upstream, which this
+  deliberately isn't.
 - **Content selection is rules-based.** Whole-token class/id matching plus a
   `<main>`/`<article>` density pick handles the common cases well; an unusual
   layout can still leak a stray sidebar or clip a section. It's not a trained
@@ -241,16 +445,16 @@ Worth reading before you rely on this.
 - **The token count is an estimate.** A ~4-chars-per-token heuristic, close
   enough to size a context window — not a real BPE tokenizer, so don't bill on
   it.
-- **Fetching arbitrary URLs is an SSRF surface.** Fine for a CLI on your machine;
-  if you expose `convertUrl` as a public endpoint, filter the destination. See
-  [SECURITY.md](.github/SECURITY.md).
+- **Key issuance is manual, not self-service.** Polar subscriptions upgrade or
+  revert the plan of a key you already issued; a brand-new subscriber doesn't
+  get a key automatically — see [Getting an API key](#getting-an-api-key).
 - **Tables and code assume valid HTML.** Deeply malformed markup, or `<`
   characters left unescaped inside `<pre>`, can still confuse any HTML parser.
 
 ## Testing
 
 ```bash
-npm test          # 38 tests: cleaning, markdown, metadata, fetch, tokens
+npm test          # 43 tests: cleaning, markdown, metadata, fetch, worker
 npm run typecheck # strict TypeScript, no emit
 npm run build     # compile the publishable SDK + CLI to dist/
 ```

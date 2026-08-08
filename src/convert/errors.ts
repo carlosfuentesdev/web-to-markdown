@@ -10,6 +10,8 @@
 export type ConvertErrorCode =
   | 'invalid_url'
   | 'unsupported_protocol'
+  /** La URL apunta a la red interna (bucle local, privada o enlace local). */
+  | 'blocked_host'
   | 'fetch_failed'
   | 'http_error'
   | 'too_large'

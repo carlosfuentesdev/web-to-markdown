@@ -81,4 +81,41 @@ describe('fetchHtml', () => {
     );
     expect(code).toBe('fetch_failed');
   });
+
+  it('decodifica con el charset declarado en Content-Type en vez de forzar UTF-8', async () => {
+    // Hallazgo 3 de la auditoría de robustez (2026-08-05): confirmado en
+    // producción con lib.ru (charset=koi8-r), que salía como caracteres de
+    // reemplazo. Aquí se reproduce el mismo patrón con ISO-8859-1 (ñ, á, é,
+    // ó son bytes fuera de ASCII en ese charset), sin depender de una URL
+    // externa: bytes crudos en ISO-8859-1, no una cadena JS reencodeada.
+    const textoOriginal = '<html><body><p>Café, niño, corazón.</p></body></html>';
+    const bytesIso88591 = Buffer.from(textoOriginal, 'latin1');
+
+    const page = await fetchHtml('https://ejemplo.com/latin1', {
+      fetchImpl: stubFetch(
+        new Response(bytesIso88591, {
+          headers: { 'content-type': 'text/html; charset=iso-8859-1' },
+        }),
+      ),
+    });
+
+    expect(page.html).toBe(textoOriginal);
+    expect(page.html).not.toContain('�'); // carácter de reemplazo Unicode
+  });
+
+  it('cae a UTF-8 si el charset declarado no existe o no es reconocido', async () => {
+    // No hacemos detección heurística: si el servidor declara un charset que
+    // el runtime no reconoce, no lo adivinamos — nos quedamos con el
+    // comportamiento de siempre (UTF-8), sin empeorarlo.
+    const html = '<html><body><p>Café, niño, corazón.</p></body></html>';
+    const page = await fetchHtml('https://ejemplo.com/charset-invalido', {
+      fetchImpl: stubFetch(
+        new Response(html, {
+          headers: { 'content-type': 'text/html; charset=no-existe-este-charset' },
+        }),
+      ),
+    });
+
+    expect(page.html).toBe(html);
+  });
 });
