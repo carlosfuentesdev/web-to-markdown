@@ -7,6 +7,7 @@ Strips the navigation, cookie banners, ads and footers; keeps the headings,
 lists, code blocks, links and tables. Runs at the edge (Cloudflare Workers) and
 in your terminal.
 
+[![CI](https://github.com/Karlangas12/web-to-markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/Karlangas12/web-to-markdown/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@karlangas12/web-to-markdown?color=cb3837&logo=npm)](https://www.npmjs.com/package/@karlangas12/web-to-markdown)
 [![tests](https://img.shields.io/badge/tests-43%20passing-brightgreen)](#testing)
 [![latency](https://img.shields.io/badge/html%E2%86%92md-~3ms-blue)](#performance)

@@ -7,6 +7,7 @@ para LLMs.** Elimina la navegación, los banners de cookies, los anuncios y los
 pies de página; conserva los encabezados, las listas, los bloques de código, los
 enlaces y las tablas. Corre en el edge (Cloudflare Workers) y en tu terminal.
 
+[![CI](https://github.com/Karlangas12/web-to-markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/Karlangas12/web-to-markdown/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@karlangas12/web-to-markdown?color=cb3837&logo=npm)](https://www.npmjs.com/package/@karlangas12/web-to-markdown)
 [![tests](https://img.shields.io/badge/tests-43%20passing-brightgreen)](#pruebas)
 [![latency](https://img.shields.io/badge/html%E2%86%92md-~3ms-blue)](#rendimiento)
