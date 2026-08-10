@@ -7,9 +7,8 @@ Strips the navigation, cookie banners, ads and footers; keeps the headings,
 lists, code blocks, links and tables. Runs at the edge (Cloudflare Workers) and
 in your terminal.
 
-[![CI](https://github.com/Karlangas12/web-to-markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/Karlangas12/web-to-markdown/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@karlangas12/web-to-markdown?color=cb3837&logo=npm)](https://www.npmjs.com/package/@karlangas12/web-to-markdown)
-[![tests](https://img.shields.io/badge/tests-88%20passing-brightgreen)](#testing)
+[![tests](https://img.shields.io/badge/tests-43%20passing-brightgreen)](#testing)
 [![latency](https://img.shields.io/badge/html%E2%86%92md-~3ms-blue)](#performance)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen)](https://nodejs.org)
@@ -455,8 +454,7 @@ Worth reading before you rely on this.
 ## Testing
 
 ```bash
-npm test          # 88 tests: cleaning, markdown, metadata, fetch, convert,
-                  # hydration extraction, URL/SSRF safety, tokens, shrink
+npm test          # 43 tests: cleaning, markdown, metadata, fetch, worker
 npm run typecheck # strict TypeScript, no emit
 npm run build     # compile the publishable SDK + CLI to dist/
 ```

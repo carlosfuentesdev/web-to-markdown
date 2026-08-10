@@ -7,9 +7,8 @@ para LLMs.** Elimina la navegación, los banners de cookies, los anuncios y los
 pies de página; conserva los encabezados, las listas, los bloques de código, los
 enlaces y las tablas. Corre en el edge (Cloudflare Workers) y en tu terminal.
 
-[![CI](https://github.com/Karlangas12/web-to-markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/Karlangas12/web-to-markdown/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/@karlangas12/web-to-markdown?color=cb3837&logo=npm)](https://www.npmjs.com/package/@karlangas12/web-to-markdown)
-[![tests](https://img.shields.io/badge/tests-88%20passing-brightgreen)](#pruebas)
+[![tests](https://img.shields.io/badge/tests-43%20passing-brightgreen)](#pruebas)
 [![latency](https://img.shields.io/badge/html%E2%86%92md-~3ms-blue)](#rendimiento)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-brightgreen)](https://nodejs.org)
@@ -455,8 +454,7 @@ Conviene leerlos antes de depender de esto.
 ## Pruebas
 
 ```bash
-npm test          # 88 tests: limpieza, markdown, metadatos, fetch, convert,
-                  # extracción de hidratación, seguridad URL/SSRF, tokens, shrink
+npm test          # 43 tests: limpieza, markdown, metadatos, fetch, worker
 npm run typecheck # TypeScript estricto, sin emitir
 npm run build     # compila el SDK + CLI publicable a dist/
 ```
