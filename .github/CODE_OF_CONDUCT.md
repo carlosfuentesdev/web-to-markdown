@@ -57,7 +57,7 @@ an individual is officially representing the community in public spaces.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement privately, by
-direct message to the maintainer [@Karlangas12](https://github.com/Karlangas12).
+direct message to the maintainer [@carlosfuentesdev](https://github.com/carlosfuentesdev).
 All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the

@@ -13,7 +13,7 @@ it. Extraction edge cases are where this tool lives or dies.
 ## Getting started
 
 ```bash
-git clone https://github.com/Karlangas12/web-to-markdown.git
+git clone https://github.com/carlosfuentesdev/web-to-markdown.git
 cd web-to-markdown
 npm ci
 npm test

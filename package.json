@@ -4,14 +4,14 @@
   "type": "module",
   "description": "Turn any web page or raw HTML into clean, dense, LLM-ready Markdown. Runs on Cloudflare Workers, Node, Deno & Bun — CLI + SDK.",
   "license": "MIT",
-  "author": "Karlangas12",
-  "homepage": "https://github.com/Karlangas12/web-to-markdown#readme",
+  "author": "Carlos Fuentes Navarro",
+  "homepage": "https://github.com/carlosfuentesdev/web-to-markdown#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Karlangas12/web-to-markdown.git"
+    "url": "git+https://github.com/carlosfuentesdev/web-to-markdown.git"
   },
   "bugs": {
-    "url": "https://github.com/Karlangas12/web-to-markdown/issues"
+    "url": "https://github.com/carlosfuentesdev/web-to-markdown/issues"
   },
   "keywords": [
     "markdown",

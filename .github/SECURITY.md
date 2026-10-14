@@ -17,7 +17,7 @@ disclosure before a fix puts every user at risk.
 
 Report privately through **GitHub's private vulnerability reporting**:
 
-1. Go to the [**Security** tab](https://github.com/Karlangas12/web-to-markdown/security)
+1. Go to the [**Security** tab](https://github.com/carlosfuentesdev/web-to-markdown/security)
    of this repository.
 2. Click **Report a vulnerability**.
 3. Describe the issue, the affected version, and a reproduction if you have one.
@@ -51,5 +51,5 @@ crafted HTML input that makes the parser/converter blow up memory or CPU
 Out of scope: the fact that a page you point it at can contain anything — the
 tool converts content, it does not vouch for it. Treat converted Markdown from an
 untrusted page as untrusted data (that is exactly what
-[mcp-shield-proxy](https://github.com/Karlangas12/mcp-shield-proxy) is for on the
+[mcp-shield-proxy](https://github.com/carlosfuentesdev/mcp-shield-proxy) is for on the
 agent side).
