@@ -418,7 +418,7 @@ analítica, nada llama a casa. Lo que despliegues en tu propio Worker es tuyo.
 de IA. Se componen entre sí:
 
 - **[openapi-to-mcp](https://www.npmjs.com/package/@karlangas12/openapi-to-mcp)** — convierte cualquier spec OpenAPI en un servidor MCP en vivo.
-- **[mcp-shield-proxy](https://github.com/Karlangas12/mcp-shield-proxy)** — un cortafuegos local que inspecciona lo que hacen tus herramientas MCP.
+- **[mcp-shield-proxy](https://github.com/carlosfuentesdev/mcp-shield-proxy)** — un cortafuegos local que inspecciona lo que hacen tus herramientas MCP.
 - **web-to-markdown** — alimenta a esas herramientas con contexto web limpio y denso.
 
 ## Límites honestos

@@ -62,7 +62,7 @@ export const DEFAULT_TIMEOUT_MS = 5_000;
 
 /** User-Agent por defecto: identificable y con URL de contacto. */
 export const DEFAULT_USER_AGENT =
-  'Mozilla/5.0 (compatible; web-to-markdown/0.1; +https://github.com/Karlangas12/web-to-markdown)';
+  'Mozilla/5.0 (compatible; web-to-markdown/0.1; +https://github.com/carlosfuentesdev/web-to-markdown)';
 
 /** Firma de `fetch`, para poder inyectar un doble en los tests. */
 export type FetchLike = (input: string | URL, init?: RequestInit) => Promise<Response>;

@@ -421,7 +421,7 @@ no analytics, nothing phones home. What you deploy on your own Worker is yours.
 agents. They compose:
 
 - **[openapi-to-mcp](https://www.npmjs.com/package/@karlangas12/openapi-to-mcp)** — turn any OpenAPI spec into a live MCP server.
-- **[mcp-shield-proxy](https://github.com/Karlangas12/mcp-shield-proxy)** — a local firewall that inspects what your MCP tools do.
+- **[mcp-shield-proxy](https://github.com/carlosfuentesdev/mcp-shield-proxy)** — a local firewall that inspects what your MCP tools do.
 - **web-to-markdown** — feed those tools clean, dense context from the web.
 
 ## Honest limitations
